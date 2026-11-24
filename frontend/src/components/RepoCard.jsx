@@ -15,6 +15,7 @@ export default function RepoCard({
   stars,
   forks,
   updated,
+  url,
 }) {
   return (
     <div className="repo-card">
@@ -25,7 +26,14 @@ export default function RepoCard({
 
         <span className="repo-status">Public</span>
 
-        <a href="#" className="repo-open-link" aria-label="Open repository">
+        <a
+          href={url || "#"}
+          className="repo-open-link"
+          aria-label="Open repository"
+          {...(url
+            ? { target: "_blank", rel: "noopener noreferrer" }
+            : { onClick: (event) => event.preventDefault() })}
+        >
           <ArrowUpRight size={18} />
         </a>
       </div>
