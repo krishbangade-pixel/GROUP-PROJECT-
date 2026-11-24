@@ -1815,7 +1815,8 @@ a {
   cursor: not-allowed;
 }
 
-.commit-demo-note {
+.commit-demo-note,
+.commit-info-note {
   display: flex;
   align-items: flex-start;
   gap: 8px;
@@ -1977,7 +1978,8 @@ a {
   line-height: 1.8;
 }
 
-.demo-summary-label {
+.demo-summary-label,
+.readme-summary-label {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -2888,50 +2890,19 @@ body,
   cursor: wait;
 }
 
-.auth-divider {
-  display: flex;
-  align-items: center;
-  margin: 18px 0;
-  text-align: center;
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
-.auth-divider::before,
-.auth-divider::after {
-  content: "";
-  flex: 1;
-  border-bottom: 1px solid var(--border);
-}
-
-.auth-divider span {
-  padding: 0 10px;
-}
-
-.auth-demo-btn {
-  width: 100%;
-  height: 36px;
+.auth-supabase-badge {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  background: #21262d;
-  color: var(--text-primary);
-  border: 1px solid var(--border);
+  gap: 6px;
+  margin-top: 14px;
+  padding: 6px 10px;
   border-radius: 6px;
-  font-size: 12px;
+  background: rgba(63, 185, 80, 0.08);
+  border: 1px solid rgba(63, 185, 80, 0.2);
+  color: var(--green);
+  font-size: 11px;
   font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.auth-demo-btn:hover {
-  background: #30363d;
-  border-color: #8b949e;
-}
-
-.auth-demo-btn svg {
-  color: var(--blue-light);
 }
 
 .auth-terms-note {
