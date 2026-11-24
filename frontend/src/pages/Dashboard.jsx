@@ -7,7 +7,6 @@ import {
   Activity,
   Star,
   ArrowUpRight,
-  Clock3,
   Zap,
   TrendingUp,
 } from "lucide-react";

@@ -62,7 +62,7 @@ export default function SettingsPage() {
 
         <div className="settings-info-row">
           <span>Accent colors</span>
-          <strong>Purple and Blue</strong>
+          <strong>GitHub Dark (Blue & Slate)</strong>
         </div>
       </section>
 
