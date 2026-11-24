@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import {
   History as HistoryIcon,
@@ -17,80 +17,30 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
-const historyItems = [
-  {
-    id: 1,
-    name: "facebook/react",
-    description: "The library for web and native user interfaces.",
-    language: "JavaScript",
-    stars: "238k",
-    forks: "48.9k",
-    updated: "2 hours ago",
-    analyzed: "Today",
-    summary:
-      "React is a JavaScript library for building user interfaces. It supports reusable components and interactive web applications.",
-  },
-  {
-    id: 2,
-    name: "vercel/next.js",
-    description: "The React framework for production applications.",
-    language: "TypeScript",
-    stars: "132k",
-    forks: "28.1k",
-    updated: "5 hours ago",
-    analyzed: "Yesterday",
-    summary:
-      "Next.js is a React framework for building full-stack web applications with routing, rendering strategies and performance optimization.",
-  },
-];
-
-const STORAGE_KEY = "reporadar_saved_summaries";
+import {
+  getSearchHistory,
+  getSavedSummaries,
+  isSummarySaved,
+  saveSummary,
+  removeSavedSummary,
+} from "../utils/storage";
 
 export default function History() {
-  const [savedSummaries, setSavedSummaries] = useState(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify(savedSummaries)
-      );
-    } catch (error) {
-      console.error("Unable to save summaries:", error);
-    }
-  }, [savedSummaries]);
-
-  const isSaved = (id) =>
-    savedSummaries.some((item) => item.id === id);
+  const [historyItems] = useState(() => getSearchHistory());
+  const [savedSummaries, setSavedSummaries] = useState(() => getSavedSummaries());
 
   const handleSave = (item) => {
-    if (isSaved(item.id)) return;
+    if (isSummarySaved(item.id)) return;
 
-    setSavedSummaries((previous) => [
-      ...previous,
-      {
-        ...item,
-        savedAt: new Date().toLocaleDateString(),
-      },
-    ]);
+    setSavedSummaries(saveSummary(item));
   };
 
   const handleRemove = (id) => {
-    setSavedSummaries((previous) =>
-      previous.filter((item) => item.id !== id)
-    );
+    setSavedSummaries(removeSavedSummary(id));
   };
 
   return (
     <div className="history-page">
-      {/* PAGE HEADING */}
       <section className="page-heading">
         <div className="heading-icon">
           <HistoryIcon size={23} />
@@ -104,7 +54,6 @@ export default function History() {
         </div>
       </section>
 
-      {/* SUMMARY OVERVIEW */}
       <section className="history-summary">
         <div className="history-summary-icon">
           <Sparkles size={21} />
@@ -113,8 +62,8 @@ export default function History() {
         <div>
           <h3>Your exploration journey</h3>
           <p>
-            You have explored {historyItems.length} demo repositories
-            and saved {savedSummaries.length} summaries.
+            You have explored {historyItems.length} {historyItems.length === 1 ? "repository" : "repositories"}{" "}
+            and saved {savedSummaries.length} {savedSummaries.length === 1 ? "summary" : "summaries"}.
           </p>
         </div>
 
@@ -123,7 +72,6 @@ export default function History() {
         </span>
       </section>
 
-      {/* RECENT ACTIVITY */}
       <section className="history-list-section">
         <div className="section-heading">
           <div>
@@ -132,80 +80,98 @@ export default function History() {
           </div>
         </div>
 
-        <div className="history-list">
-          {historyItems.map((item) => (
-            <div className="history-item" key={item.id}>
-              <div className="history-repo-icon">
-                <GitBranch size={22} />
-              </div>
+        {historyItems.length > 0 ? (
+          <div className="history-list">
+            {historyItems.map((item) => (
+              <div className="history-item" key={item.id}>
+                <div className="history-repo-icon">
+                  <GitBranch size={22} />
+                </div>
 
-              <div className="history-item-content">
-                <h3>{item.name}</h3>
-                <p>{item.description}</p>
+                <div className="history-item-content">
+                  <h3>{item.name}</h3>
+                  <p>{item.description}</p>
 
-                <div className="history-meta">
-                  <span>{item.language}</span>
+                  <div className="history-meta">
+                    <span>{item.language}</span>
 
-                  <span>
-                    <Star size={14} />
-                    {item.stars}
+                    <span>
+                      <Star size={14} />
+                      {item.stars}
+                    </span>
+
+                    <span>
+                      <GitFork size={14} />
+                      {item.forks}
+                    </span>
+
+                    <span>
+                      <Clock3 size={14} />
+                      Updated {item.updated}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="history-item-right">
+                  <span className="history-date">
+                    {item.analyzed}
                   </span>
 
-                  <span>
-                    <GitFork size={14} />
-                    {item.forks}
-                  </span>
+                  <button
+                    type="button"
+                    className={`save-summary-button ${
+                      isSummarySaved(item.id) ? "saved" : ""
+                    }`}
+                    onClick={() => handleSave(item)}
+                    disabled={isSummarySaved(item.id)}
+                    title={
+                      isSummarySaved(item.id)
+                        ? "Already saved"
+                        : "Save summary"
+                    }
+                  >
+                    {isSummarySaved(item.id) ? (
+                      <>
+                        <BookmarkCheck size={16} />
+                        Saved
+                      </>
+                    ) : (
+                      <>
+                        <Bookmark size={16} />
+                        Save Summary
+                      </>
+                    )}
+                  </button>
 
-                  <span>
-                    <Clock3 size={14} />
-                    Updated {item.updated}
-                  </span>
+                  {item.url ? (
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`Open ${item.name}`}
+                    >
+                      <ArrowUpRight size={19} />
+                    </a>
+                  ) : (
+                    <ArrowUpRight size={19} />
+                  )}
                 </div>
               </div>
-
-              <div className="history-item-right">
-                <span className="history-date">
-                  {item.analyzed}
-                </span>
-
-                <span className="history-demo-badge">
-                  Demo
-                </span>
-
-                <button
-                  type="button"
-                  className={`save-summary-button ${
-                    isSaved(item.id) ? "saved" : ""
-                  }`}
-                  onClick={() => handleSave(item)}
-                  disabled={isSaved(item.id)}
-                  title={
-                    isSaved(item.id)
-                      ? "Already saved"
-                      : "Save summary"
-                  }
-                >
-                  {isSaved(item.id) ? (
-                    <>
-                      <BookmarkCheck size={16} />
-                      Saved
-                    </>
-                  ) : (
-                    <>
-                      <Bookmark size={16} />
-                      Save Summary
-                    </>
-                  )}
-                </button>
-
-                <ArrowUpRight size={19} />
-              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="saved-empty-state">
+            <div className="empty-icon">
+              <Search size={27} />
             </div>
-          ))}
-        </div>
+            <h3>No repositories analyzed yet</h3>
+            <p>
+              Analyze a public GitHub repository to see it appear in your history.
+            </p>
+          </div>
+        )}
       </section>
 
-      {/* SAVED SUMMARIES */}
       <section className="saved-summaries-section">
         <div className="section-heading">
           <div>
@@ -254,9 +220,15 @@ export default function History() {
                 </div>
 
                 <div className="saved-summary-footer">
-                  <span className="history-demo-badge">
-                    Demo Summary
-                  </span>
+                  {item.source === "demo" ? (
+                    <span className="history-demo-badge">
+                      Demo Summary
+                    </span>
+                  ) : (
+                    <span className="history-live-badge">
+                      Saved summary
+                    </span>
+                  )}
 
                   <button
                     type="button"
@@ -287,7 +259,6 @@ export default function History() {
         )}
       </section>
 
-      {/* SEARCH ANOTHER REPOSITORY */}
       <section className="history-empty-tip">
         <div className="empty-icon">
           <Search size={25} />
