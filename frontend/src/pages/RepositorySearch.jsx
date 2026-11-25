@@ -1,5 +1,6 @@
 
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import {
   Search,
@@ -48,6 +49,7 @@ import {
   isSummarySaved,
   saveSummary,
 } from "../utils/storage";
+import { useAuth } from "../context/AuthContext";
 
 const UNAVAILABLE = "Not available from this analysis.";
 
@@ -132,7 +134,11 @@ function buildHistoryEntry(repositoryUrl, analysis, summary) {
 }
 
 export default function RepositorySearch() {
-  const [searchQuery, setSearchQuery] = useState("");
+  const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const repoFromUrl = searchParams.get("repo");
+
+  const [searchQuery, setSearchQuery] = useState(repoFromUrl || "");
   const [repository, setRepository] = useState(null);
   const [loading, setLoading] = useState(false);
   const [loadingStage, setLoadingStage] = useState("");
@@ -141,8 +147,11 @@ export default function RepositorySearch() {
   const [saved, setSaved] = useState(false);
   const requestIdRef = useRef(0);
   const abortRef = useRef(null);
+  const lastAnalyzedRef = useRef("");
 
-  const runAnalysis = async (rawQuery) => {
+  const runAnalysis = useCallback(async (rawQuery) => {
+    if (!rawQuery || !rawQuery.trim()) return;
+
     let normalized;
 
     try {
@@ -185,7 +194,7 @@ export default function RepositorySearch() {
       }
 
       const historyEntry = buildHistoryEntry(normalized.repositoryUrl, analysis, null);
-      recordSearchHistory(historyEntry);
+      recordSearchHistory(historyEntry, user?.id);
 
       setRepository({
         analysis,
@@ -211,7 +220,7 @@ export default function RepositorySearch() {
           analysis,
           summary
         );
-        recordSearchHistory(updatedEntry);
+        recordSearchHistory(updatedEntry, user?.id);
         setSaved(isSummarySaved(updatedEntry.id));
 
         setRepository({
@@ -254,7 +263,19 @@ export default function RepositorySearch() {
         setLoadingStage("");
       }
     }
-  };
+  }, [user]);
+
+  // Automatically trigger analysis when URL has ?repo= parameter
+  useEffect(() => {
+    if (repoFromUrl && repoFromUrl.trim()) {
+      const target = repoFromUrl.trim();
+      if (lastAnalyzedRef.current !== target) {
+        lastAnalyzedRef.current = target;
+        setSearchQuery(target);
+        runAnalysis(target);
+      }
+    }
+  }, [repoFromUrl, runAnalysis]);
 
   const handleSearch = (event) => {
     event.preventDefault();
@@ -263,7 +284,20 @@ export default function RepositorySearch() {
       return;
     }
 
-    runAnalysis(searchQuery);
+    const trimmed = searchQuery.trim();
+    if (!trimmed) return;
+
+    lastAnalyzedRef.current = trimmed;
+    setSearchParams({ repo: trimmed });
+    runAnalysis(trimmed);
+  };
+
+  const handleSuggestion = (targetRepo) => {
+    if (loading) return;
+    setSearchQuery(targetRepo);
+    setSearchParams({ repo: targetRepo });
+    lastAnalyzedRef.current = targetRepo;
+    runAnalysis(targetRepo);
   };
 
   const handleRetry = () => {
@@ -271,7 +305,11 @@ export default function RepositorySearch() {
       return;
     }
 
-    runAnalysis(searchQuery);
+    const target = searchQuery.trim() || repoFromUrl || repository?.repositoryUrl;
+    if (target) {
+      lastAnalyzedRef.current = target;
+      runAnalysis(target);
+    }
   };
 
   const handleRetrySummary = () => {
@@ -287,7 +325,7 @@ export default function RepositorySearch() {
       return;
     }
 
-    saveSummary(repository.historyEntry);
+    saveSummary(repository.historyEntry, user?.id);
     setSaved(true);
   };
 
@@ -346,7 +384,7 @@ export default function RepositorySearch() {
           <button
             type="button"
             disabled={loading}
-            onClick={() => setSearchQuery("facebook/react")}
+            onClick={() => handleSuggestion("facebook/react")}
           >
             facebook/react
           </button>
@@ -354,7 +392,7 @@ export default function RepositorySearch() {
           <button
             type="button"
             disabled={loading}
-            onClick={() => setSearchQuery("vercel/next.js")}
+            onClick={() => handleSuggestion("vercel/next.js")}
           >
             vercel/next.js
           </button>
@@ -589,7 +627,7 @@ export default function RepositorySearch() {
 
             <SafeMarkdown content={analysis.readme} />
 
-            <span className="demo-summary-label">
+            <span className="readme-summary-label">
               <Sparkles size={14} />
               Retrieved from GitHub — treated as untrusted content
             </span>

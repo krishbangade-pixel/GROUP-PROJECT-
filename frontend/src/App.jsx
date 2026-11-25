@@ -1,4 +1,3 @@
-
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import Sidebar from "./components/Sidebar";
@@ -9,6 +8,9 @@ import RepositorySearch from "./pages/RepositorySearch";
 import History from "./pages/History";
 import SettingsPage from "./pages/Settings";
 import CommitAnalyzer from "./pages/CommitAnalyzer";
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+import { AuthProvider } from "./context/AuthContext";
 
 import "./App.css";
 
@@ -38,7 +40,13 @@ function AppLayout() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AppLayout />
+      <AuthProvider>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/*" element={<AppLayout />} />
+        </Routes>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

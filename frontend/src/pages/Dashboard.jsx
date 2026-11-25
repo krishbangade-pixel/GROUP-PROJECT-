@@ -1,4 +1,5 @@
-
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   GitBranch,
   Search,
@@ -7,68 +8,88 @@ import {
   Activity,
   Star,
   ArrowUpRight,
-  Clock3,
   Zap,
   TrendingUp,
 } from "lucide-react";
 
 import StatCard from "../components/StatCard";
 import RepoCard from "../components/RepoCard";
+import { getDashboardStats, getRecentRepositories } from "../services/db";
+import { useAuth } from "../context/AuthContext";
 
 export default function Dashboard() {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [statsData, setStatsData] = useState({
+    repositoriesAnalyzed: 0,
+    totalSearches: 0,
+    aiSummaries: 0,
+    commitsReviewed: 0,
+  });
+  const [repositories, setRepositories] = useState([]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadData() {
+      try {
+        const [stats, repos] = await Promise.all([
+          getDashboardStats(user?.id),
+          getRecentRepositories(4, user?.id),
+        ]);
+
+        if (mounted) {
+          setStatsData(stats);
+          setRepositories(repos);
+        }
+      } catch (err) {
+        console.warn("Could not load dashboard data:", err);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadData();
+
+    return () => {
+      mounted = false;
+    };
+  }, [user]);
+
   const stats = [
     {
       title: "Repositories Analyzed",
-      value: "24",
-      change: "+12.5%",
-      description: "Compared to last month",
+      value: String(statsData.repositoriesAnalyzed),
+      change: statsData.repositoriesAnalyzed > 0 ? "Active" : "Ready",
+      description: "Explored projects",
       icon: FolderGit2,
       color: "purple",
     },
     {
       title: "Total Searches",
-      value: "86",
-      change: "+8.2%",
-      description: "Repository searches",
+      value: String(statsData.totalSearches),
+      change: statsData.totalSearches > 0 ? "Synced" : "Ready",
+      description: "Search history",
       icon: Search,
       color: "blue",
     },
     {
       title: "AI Summaries",
-      value: "42",
-      change: "+18.4%",
-      description: "Generated summaries",
+      value: String(statsData.aiSummaries),
+      change: statsData.aiSummaries > 0 ? "Saved" : "Ready",
+      description: "Saved in database",
       icon: Sparkles,
       color: "pink",
     },
     {
       title: "Commits Reviewed",
-      value: "318",
-      change: "+24.6%",
-      description: "Across all repositories",
+      value: String(statsData.commitsReviewed),
+      change: statsData.commitsReviewed > 0 ? "Analyzed" : "Ready",
+      description: "Commit analyses",
       icon: Activity,
       color: "orange",
-    },
-  ];
-
-  const repositories = [
-    {
-      name: "facebook/react",
-      description:
-        "The library for web and native user interfaces.",
-      language: "JavaScript",
-      stars: "238k",
-      forks: "48.9k",
-      updated: "2 hours ago",
-    },
-    {
-      name: "vercel/next.js",
-      description:
-        "The React framework for production applications.",
-      language: "TypeScript",
-      stars: "132k",
-      forks: "28.1k",
-      updated: "5 hours ago",
     },
   ];
 
@@ -89,19 +110,18 @@ export default function Dashboard() {
 
           <p>
             Turn complex GitHub repositories into clear,
-            beginner-friendly insights with AI-powered summaries.
+            beginner-friendly insights with AI-powered summaries backed by Supabase.
           </p>
 
-          <button
+          <Link
+            to="/search"
             className="primary-button"
-            onClick={() => {
-              window.location.href = "/search";
-            }}
+            style={{ textDecoration: "none" }}
           >
             <Search size={18} />
             Explore Repository
             <ArrowUpRight size={17} />
-          </button>
+          </Link>
         </div>
 
         <div className="welcome-visual">
@@ -118,13 +138,13 @@ export default function Dashboard() {
               <div><span>01</span> const repository = {"{"}</div>
               <div><span>02</span> &nbsp; name: <b>"awesome-project"</b>,</div>
               <div><span>03</span> &nbsp; insights: <b>AI.analyze()</b>,</div>
-              <div><span>04</span> &nbsp; commits: <b>128</b></div>
+              <div><span>04</span> &nbsp; database: <b>"Supabase"</b></div>
               <div><span>05</span> {"}"};</div>
             </div>
 
             <div className="visual-ai">
               <Sparkles size={17} />
-              <span>AI analysis completed</span>
+              <span>Supabase Database Connected</span>
             </div>
           </div>
         </div>
@@ -134,12 +154,12 @@ export default function Dashboard() {
         <div className="section-heading">
           <div>
             <h2>Overview</h2>
-            <p>Your repository activity at a glance.</p>
+            <p>Your live repository activity in Supabase.</p>
           </div>
 
           <span className="period-label">
             <TrendingUp size={15} />
-            All time
+            Live Database
           </span>
         </div>
 
@@ -154,20 +174,42 @@ export default function Dashboard() {
         <div className="section-heading">
           <div>
             <h2>Recent Repositories</h2>
-            <p>Continue exploring your recently viewed projects.</p>
+            <p>Continue exploring your recently analyzed projects.</p>
           </div>
 
-          <a href="/history" className="view-all-link">
+          <Link to="/history" className="view-all-link">
             View history
             <ArrowUpRight size={16} />
-          </a>
+          </Link>
         </div>
 
-        <div className="repositories-grid">
-          {repositories.map((repo) => (
-            <RepoCard key={repo.name} {...repo} />
-          ))}
-        </div>
+        {loading ? (
+          <div className="search-empty-state" style={{ margin: "10px 0", padding: "28px" }}>
+            <p>Loading your activity from Supabase...</p>
+          </div>
+        ) : repositories.length > 0 ? (
+          <div className="repositories-grid">
+            {repositories.map((repo) => (
+              <RepoCard key={repo.name} {...repo} />
+            ))}
+          </div>
+        ) : (
+          <div className="search-empty-state" style={{ margin: "10px 0" }}>
+            <div className="empty-icon">
+              <FolderGit2 size={24} />
+            </div>
+            <h2>No repositories analyzed yet</h2>
+            <p>Search any public GitHub repository to view AI summaries, dependencies, and metrics here.</p>
+            <Link
+              to="/search"
+              className="primary-button"
+              style={{ marginTop: "16px", textDecoration: "none" }}
+            >
+              <Search size={16} />
+              Search First Repository
+            </Link>
+          </div>
+        )}
       </section>
 
       <section className="dashboard-tip">
@@ -179,7 +221,7 @@ export default function Dashboard() {
           <h3>Make sense of any codebase</h3>
           <p>
             Search a public repository to explore its features,
-            technologies, prerequisites and recent activity.
+            technologies, prerequisites and recent commit activity.
           </p>
         </div>
 

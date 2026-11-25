@@ -1,8 +1,12 @@
 const { GoogleGenAI } = require("@google/genai");
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY
-});
+function getAIClient() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY is missing from the backend/.env file.");
+  }
+  return new GoogleGenAI({ apiKey });
+}
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -54,6 +58,7 @@ ${JSON.stringify(commitData)}
         `Commit AI request attempt ${attempt}/${maxAttempts}`
       );
 
+      const ai = getAIClient();
       const response = await ai.models.generateContent({
         model: process.env.GEMINI_MODEL || "gemini-3.8-flash",
         contents: prompt,

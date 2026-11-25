@@ -15,6 +15,8 @@ import {
 
 import { analyzeCommit } from "../services/api";
 import { normalizeRepositoryInput } from "../utils/repository";
+import { recordCommitAnalysis } from "../services/db";
+import { useAuth } from "../context/AuthContext";
 
 function safeList(value) {
   return Array.isArray(value)
@@ -65,6 +67,7 @@ function SummarySection({ title, description, items }) {
 }
 
 export default function CommitAnalyzer() {
+  const { user } = useAuth();
   const [repository, setRepository] = useState("");
   const [commitHash, setCommitHash] = useState("");
   const [loading, setLoading] = useState(false);
@@ -117,6 +120,17 @@ export default function CommitAnalyzer() {
       }
 
       setResult(response.data);
+
+      recordCommitAnalysis({
+        repository: normalized.fullRepositoryName || repository,
+        commitHash: hash,
+        message: response.data.commit?.message,
+        author: response.data.commit?.author?.name,
+        date: response.data.commit?.author?.date,
+        summary: response.data.aiSummary?.summary,
+        breakingChanges: response.data.aiSummary?.breakingChanges,
+        improvements: response.data.aiSummary?.improvements,
+      }, user?.id);
 
     } catch (failure) {
       setError(
@@ -284,7 +298,7 @@ export default function CommitAnalyzer() {
           </button>
         </form>
 
-        <p className="commit-demo-note">
+        <p className="commit-info-note">
           <AlertCircle size={15} />
           Live GitHub metadata and Gemini AI analysis.
           Full code differences are not inspected.

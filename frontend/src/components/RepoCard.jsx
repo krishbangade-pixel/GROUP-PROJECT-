@@ -1,4 +1,5 @@
 
+import { Link } from "react-router-dom";
 import {
   GitBranch,
   Star,
@@ -38,7 +39,12 @@ export default function RepoCard({
         </a>
       </div>
 
-      <h3>{name}</h3>
+      <Link
+        to={`/search?repo=${encodeURIComponent(name)}`}
+        style={{ textDecoration: "none", color: "inherit" }}
+      >
+        <h3 style={{ cursor: "pointer" }}>{name}</h3>
+      </Link>
 
       <p className="repo-description">
         {description || "No description available for this repository."}
