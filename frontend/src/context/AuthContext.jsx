@@ -1,81 +1,225 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { supabase } from "../services/supabase";
 
 const AuthContext = createContext(null);
 
-const STORAGE_KEY = "reporadar_auth_user";
-
-const DEFAULT_USER = {
-  name: "Krish Bangade",
-  username: "krishbangade-pixel",
-  email: "krish@example.com",
-  role: "Workspace Owner",
-};
-
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
+  const [user, setUser] = useState(null);
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchProfile = useCallback(async (authUser) => {
+    if (!authUser) return null;
+
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      return stored ? JSON.parse(stored) : DEFAULT_USER;
-    } catch {
-      return DEFAULT_USER;
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", authUser.id)
+        .maybeSingle();
+
+      const fullName =
+        profile?.full_name ||
+        authUser.user_metadata?.full_name ||
+        authUser.user_metadata?.name ||
+        authUser.email?.split("@")[0] ||
+        "Developer";
+
+      const username =
+        profile?.username ||
+        authUser.user_metadata?.username ||
+        authUser.email?.split("@")[0]?.toLowerCase().replace(/\s+/g, "-") ||
+        "developer";
+
+      return {
+        id: authUser.id,
+        email: authUser.email,
+        name: fullName,
+        username: username,
+        avatar_url: profile?.avatar_url || authUser.user_metadata?.avatar_url || null,
+        role: "Workspace Member",
+      };
+    } catch (e) {
+      console.warn("Could not fetch user profile from Supabase:", e);
+      return {
+        id: authUser.id,
+        email: authUser.email,
+        name: authUser.user_metadata?.full_name || authUser.email?.split("@")[0] || "Developer",
+        username: authUser.user_metadata?.username || authUser.email?.split("@")[0] || "developer",
+        role: "Workspace Member",
+      };
     }
-  });
+  }, []);
 
   useEffect(() => {
-    try {
-      if (user) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-      } else {
-        localStorage.removeItem(STORAGE_KEY);
+    let mounted = true;
+
+    async function initAuth() {
+      try {
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        if (mounted) {
+          setSession(initialSession);
+          if (initialSession?.user) {
+            const profile = await fetchProfile(initialSession.user);
+            setUser(profile);
+          } else {
+            setUser(null);
+          }
+        }
+      } catch (err) {
+        console.error("Supabase auth init error:", err);
+      } finally {
+        if (mounted) setLoading(false);
       }
-    } catch (e) {
-      console.error("Failed to sync user to localStorage", e);
     }
-  }, [user]);
 
-  const login = ({ identifier }) => {
-    const cleanId = (identifier || "").trim();
-    const username = cleanId.includes("@")
-      ? cleanId.split("@")[0]
-      : cleanId || "developer";
-    const email = cleanId.includes("@")
-      ? cleanId
-      : `${username}@example.com`;
+    initAuth();
 
-    const newUser = {
-      name: username.charAt(0).toUpperCase() + username.slice(1),
-      username: username.toLowerCase().replace(/\s+/g, "-"),
-      email: email.toLowerCase(),
-      role: "Member",
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, currentSession) => {
+      if (!mounted) return;
+      setSession(currentSession);
+      if (currentSession?.user) {
+        const profile = await fetchProfile(currentSession.user);
+        setUser(profile);
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription?.unsubscribe();
     };
-    setUser(newUser);
-    return newUser;
+  }, [fetchProfile]);
+
+  const login = async ({ identifier, password }) => {
+    const cleanId = (identifier || "").trim();
+    let email = cleanId;
+
+    // If identifier doesn't have an @, look up email in profiles table by username
+    if (!cleanId.includes("@")) {
+      try {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("email")
+          .ilike("username", cleanId)
+          .maybeSingle();
+
+        if (profile?.email) {
+          email = profile.email;
+        } else {
+          email = `${cleanId.toLowerCase()}@example.com`;
+        }
+      } catch {
+        email = `${cleanId.toLowerCase()}@example.com`;
+      }
+    }
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    const profile = await fetchProfile(data.user);
+    setUser(profile);
+    return profile;
   };
 
-  const signup = ({ name, username, email }) => {
+  const signup = async ({ name, username, email, password }) => {
     const cleanName = (name || "").trim() || "Developer";
     const cleanUsername = (username || cleanName)
       .trim()
       .toLowerCase()
-      .replace(/\s+/g, "-");
-    const cleanEmail = (email || `${cleanUsername}@example.com`).trim().toLowerCase();
+      .replace(/[^a-z0-9-_]/g, "");
+    const cleanEmail = email.trim().toLowerCase();
 
-    const newUser = {
-      name: cleanName,
-      username: cleanUsername,
+    const { data, error } = await supabase.auth.signUp({
       email: cleanEmail,
-      role: "Workspace Owner",
-    };
-    setUser(newUser);
-    return newUser;
+      password,
+      options: {
+        data: {
+          full_name: cleanName,
+          username: cleanUsername,
+        },
+      },
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    if (data.user) {
+      try {
+        await supabase.from("profiles").upsert({
+          id: data.user.id,
+          full_name: cleanName,
+          username: cleanUsername,
+          email: cleanEmail,
+          updated_at: new Date().toISOString(),
+        });
+      } catch (e) {
+        console.warn("Could not upsert profile directly:", e);
+      }
+    }
+
+    if (data.session) {
+      const profile = await fetchProfile(data.user);
+      setUser(profile);
+      return profile;
+    } else {
+      try {
+        const { data: signInData } = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password,
+        });
+        if (signInData?.user) {
+          const profile = await fetchProfile(signInData.user);
+          setUser(profile);
+          return profile;
+        }
+      } catch {
+        // Fallback user object
+      }
+      const basicUser = {
+        id: data.user?.id || "new-user",
+        name: cleanName,
+        username: cleanUsername,
+        email: cleanEmail,
+        role: "Workspace Owner",
+      };
+      setUser(basicUser);
+      return basicUser;
+    }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.warn("Error signing out from Supabase:", e);
+    }
     setUser(null);
+    setSession(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, signup, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        session,
+        loading,
+        login,
+        signup,
+        logout,
+        supabase,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

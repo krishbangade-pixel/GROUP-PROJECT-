@@ -1,11 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { GitBranch, Eye, EyeOff, AlertCircle } from "lucide-react";
+import { GitBranch, Eye, EyeOff, AlertCircle, Database } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 export default function Signup() {
   const navigate = useNavigate();
-  const { signup } = useAuth();
+  const { signup, user, loading: authLoading } = useAuth();
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [user, authLoading, navigate]);
 
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
@@ -16,7 +22,7 @@ export default function Signup() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
@@ -42,11 +48,16 @@ export default function Signup() {
 
     setLoading(true);
 
-    setTimeout(() => {
-      signup({ name, username, email });
+    try {
+      await signup({ name, username, email, password });
+      navigate("/dashboard");
+    } catch (err) {
+      setError(
+        err?.message || "Failed to create Supabase account. Please try again."
+      );
+    } finally {
       setLoading(false);
-      navigate("/");
-    }, 450);
+    }
   };
 
   const getPasswordStrength = () => {
@@ -68,7 +79,7 @@ export default function Signup() {
             </div>
           </Link>
           <h1>Join RepoRadar</h1>
-          <p>Understand repositories faster with AI-powered intelligence</p>
+          <p>Create your account backed by Supabase</p>
         </div>
 
         {error && (
@@ -174,9 +185,14 @@ export default function Signup() {
               className="auth-submit-btn"
               disabled={loading}
             >
-              {loading ? "Creating account..." : "Create account"}
+              {loading ? "Creating Supabase account..." : "Create account"}
             </button>
           </form>
+
+          <div className="auth-supabase-badge">
+            <Database size={13} />
+            <span>Powered by Supabase Auth & PostgreSQL</span>
+          </div>
 
           <div className="auth-terms-note">
             By creating an account, you agree to the{" "}

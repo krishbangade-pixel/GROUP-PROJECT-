@@ -1,42 +1,72 @@
-
-import { useState } from "react";
-
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   History as HistoryIcon,
   GitBranch,
   Search,
   Sparkles,
   ArrowUpRight,
-  Clock3,
-  Star,
-  GitFork,
-  Bookmark,
   BookmarkCheck,
   Trash2,
-  FileText,
-  CheckCircle2,
+  Bookmark,
 } from "lucide-react";
 
 import {
   getSearchHistory,
   getSavedSummaries,
-  isSummarySaved,
   saveSummary,
   removeSavedSummary,
-} from "../utils/storage";
+} from "../services/db";
+import { useAuth } from "../context/AuthContext";
 
 export default function History() {
-  const [historyItems] = useState(() => getSearchHistory());
-  const [savedSummaries, setSavedSummaries] = useState(() => getSavedSummaries());
+  const { user } = useAuth();
+  const [historyItems, setHistoryItems] = useState([]);
+  const [savedSummaries, setSavedSummaries] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleSave = (item) => {
-    if (isSummarySaved(item.id)) return;
+  useEffect(() => {
+    let mounted = true;
 
-    setSavedSummaries(saveSummary(item));
+    async function loadHistoryData() {
+      try {
+        const [history, saved] = await Promise.all([
+          getSearchHistory(user?.id),
+          getSavedSummaries(user?.id),
+        ]);
+
+        if (mounted) {
+          setHistoryItems(history);
+          setSavedSummaries(saved);
+        }
+      } catch (err) {
+        console.warn("Could not load history from Supabase:", err);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadHistoryData();
+
+    return () => {
+      mounted = false;
+    };
+  }, [user]);
+
+  const handleSave = async (item) => {
+    const updated = await saveSummary(item, user?.id);
+    setSavedSummaries(updated);
   };
 
-  const handleRemove = (id) => {
-    setSavedSummaries(removeSavedSummary(id));
+  const handleRemove = async (idOrName) => {
+    const updated = await removeSavedSummary(idOrName, user?.id);
+    setSavedSummaries(updated);
+  };
+
+  const isSaved = (item) => {
+    return savedSummaries.some((s) => s.id === item.id || s.name === item.name);
   };
 
   return (
@@ -49,7 +79,7 @@ export default function History() {
         <div>
           <h1>Search History</h1>
           <p>
-            Revisit repositories you have recently explored.
+            Revisit repositories and AI summaries stored in your Supabase database.
           </p>
         </div>
       </section>
@@ -60,183 +90,79 @@ export default function History() {
         </div>
 
         <div>
-          <h3>Your exploration journey</h3>
+          <h3>Supabase Database Storage</h3>
           <p>
-            You have explored {historyItems.length} {historyItems.length === 1 ? "repository" : "repositories"}{" "}
-            and saved {savedSummaries.length} {savedSummaries.length === 1 ? "summary" : "summaries"}.
+            Searches and bookmarks are synchronized with your Supabase account.
           </p>
         </div>
 
-        <span className="history-count">
-          {historyItems.length} Repositories
-        </span>
-      </section>
-
-      <section className="history-list-section">
-        <div className="section-heading">
-          <div>
-            <h2>Recent Activity</h2>
-            <p>Your recently analyzed repositories.</p>
-          </div>
+        <div className="history-count">
+          {historyItems.length} explored · {savedSummaries.length} saved
         </div>
-
-        {historyItems.length > 0 ? (
-          <div className="history-list">
-            {historyItems.map((item) => (
-              <div className="history-item" key={item.id}>
-                <div className="history-repo-icon">
-                  <GitBranch size={22} />
-                </div>
-
-                <div className="history-item-content">
-                  <h3>{item.name}</h3>
-                  <p>{item.description}</p>
-
-                  <div className="history-meta">
-                    <span>{item.language}</span>
-
-                    <span>
-                      <Star size={14} />
-                      {item.stars}
-                    </span>
-
-                    <span>
-                      <GitFork size={14} />
-                      {item.forks}
-                    </span>
-
-                    <span>
-                      <Clock3 size={14} />
-                      Updated {item.updated}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="history-item-right">
-                  <span className="history-date">
-                    {item.analyzed}
-                  </span>
-
-                  <button
-                    type="button"
-                    className={`save-summary-button ${
-                      isSummarySaved(item.id) ? "saved" : ""
-                    }`}
-                    onClick={() => handleSave(item)}
-                    disabled={isSummarySaved(item.id)}
-                    title={
-                      isSummarySaved(item.id)
-                        ? "Already saved"
-                        : "Save summary"
-                    }
-                  >
-                    {isSummarySaved(item.id) ? (
-                      <>
-                        <BookmarkCheck size={16} />
-                        Saved
-                      </>
-                    ) : (
-                      <>
-                        <Bookmark size={16} />
-                        Save Summary
-                      </>
-                    )}
-                  </button>
-
-                  {item.url ? (
-                    <a
-                      href={item.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={`Open ${item.name}`}
-                    >
-                      <ArrowUpRight size={19} />
-                    </a>
-                  ) : (
-                    <ArrowUpRight size={19} />
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="saved-empty-state">
-            <div className="empty-icon">
-              <Search size={27} />
-            </div>
-            <h3>No repositories analyzed yet</h3>
-            <p>
-              Analyze a public GitHub repository to see it appear in your history.
-            </p>
-          </div>
-        )}
       </section>
 
+      {/* SAVED SUMMARIES SECTION */}
       <section className="saved-summaries-section">
         <div className="section-heading">
-          <div>
-            <h2>
-              <Bookmark size={20} />
-              Saved Summaries
-            </h2>
-
-            <p>
-              Repository summaries you have bookmarked.
-            </p>
-          </div>
-
-          <span className="saved-count">
-            {savedSummaries.length} Saved
-          </span>
+          <h2>
+            <BookmarkCheck size={20} />
+            Saved Summaries ({savedSummaries.length})
+          </h2>
+          <p>Bookmarks saved to Supabase</p>
         </div>
 
-        {savedSummaries.length > 0 ? (
+        {loading ? (
+          <div className="search-empty-state" style={{ padding: "26px" }}>
+            <p>Loading saved summaries...</p>
+          </div>
+        ) : savedSummaries.length > 0 ? (
           <div className="saved-summaries-grid">
             {savedSummaries.map((item) => (
-              <article
-                className="saved-summary-card"
-                key={item.id}
-              >
+              <article className="saved-summary-card" key={item.id || item.name}>
                 <div className="saved-summary-top">
                   <div className="saved-summary-icon">
-                    <FileText size={21} />
+                    <BookmarkCheck size={20} />
                   </div>
 
                   <span className="saved-status">
-                    <CheckCircle2 size={13} />
-                    Saved
+                    <BookmarkCheck size={14} />
+                    Saved in Supabase
                   </span>
                 </div>
 
-                <h3>{item.name}</h3>
+                <Link
+                  to={`/search?repo=${encodeURIComponent(item.name)}`}
+                  style={{ textDecoration: "none", color: "inherit" }}
+                >
+                  <h3 style={{ cursor: "pointer" }}>{item.name}</h3>
+                </Link>
 
                 <p className="saved-summary-description">
-                  {item.summary}
+                  {item.summary || item.description || "No summary text provided."}
                 </p>
 
                 <div className="saved-summary-meta">
-                  <span>{item.language}</span>
+                  <span>{item.language || "Not specified"}</span>
                   <span>Saved: {item.savedAt}</span>
                 </div>
 
                 <div className="saved-summary-footer">
-                  {item.source === "demo" ? (
-                    <span className="history-demo-badge">
-                      Demo Summary
-                    </span>
-                  ) : (
-                    <span className="history-live-badge">
-                      Saved summary
-                    </span>
-                  )}
+                  <Link
+                    to={`/search?repo=${encodeURIComponent(item.name)}`}
+                    className="view-all-link"
+                    style={{ fontSize: "12px" }}
+                  >
+                    View analysis
+                    <ArrowUpRight size={14} />
+                  </Link>
 
                   <button
                     type="button"
                     className="remove-summary-button"
-                    onClick={() => handleRemove(item.id)}
+                    onClick={() => handleRemove(item.id || item.name)}
                     title="Remove saved summary"
                   >
-                    <Trash2 size={16} />
+                    <Trash2 size={15} />
                     Remove
                   </button>
                 </div>
@@ -246,34 +172,97 @@ export default function History() {
         ) : (
           <div className="saved-empty-state">
             <div className="empty-icon">
-              <Bookmark size={27} />
+              <Bookmark size={22} />
             </div>
-
             <h3>No saved summaries yet</h3>
-
             <p>
-              Save a repository summary from Recent Activity.
-              Your saved summaries will appear here.
+              When exploring repositories, click "Save summary" to store reference insights in your Supabase database.
             </p>
           </div>
         )}
       </section>
 
-      <section className="history-empty-tip">
-        <div className="empty-icon">
-          <Search size={25} />
+      {/* SEARCH HISTORY SECTION */}
+      <section className="history-list-section">
+        <div className="section-heading">
+          <h2>Recent Activity ({historyItems.length})</h2>
+          <p>All repositories you have searched</p>
         </div>
 
-        <h3>Want to explore another repository?</h3>
+        {loading ? (
+          <div className="search-empty-state" style={{ padding: "26px" }}>
+            <p>Loading search history...</p>
+          </div>
+        ) : historyItems.length > 0 ? (
+          <div className="history-list">
+            {historyItems.map((item) => {
+              const saved = isSaved(item);
 
-        <p>
-          Head to Repository Search and discover another project.
-        </p>
+              return (
+                <article className="history-item" key={item.id || item.name}>
+                  <div className="history-repo-icon">
+                    <GitBranch size={22} />
+                  </div>
 
-        <a href="/search" className="primary-button">
-          <Search size={17} />
-          Search Repository
-        </a>
+                  <div className="history-item-content">
+                    <Link
+                      to={`/search?repo=${encodeURIComponent(item.name)}`}
+                      style={{ textDecoration: "none", color: "inherit" }}
+                    >
+                      <h3 style={{ cursor: "pointer" }}>{item.name}</h3>
+                    </Link>
+
+                    <p>
+                      {item.summary || item.description || "Explored repository"}
+                    </p>
+
+                    <div className="history-meta">
+                      {item.language && <span>{item.language}</span>}
+                      {item.stars && <span>★ {item.stars}</span>}
+                      {item.forks && <span>⑂ {item.forks}</span>}
+                    </div>
+                  </div>
+
+                  <div className="history-item-right">
+                    <span className="history-date">
+                      {item.analyzed || "Recently"}
+                    </span>
+
+                    <button
+                      type="button"
+                      className={`save-summary-button ${saved ? "saved" : ""}`}
+                      onClick={() => handleSave(item)}
+                      disabled={saved}
+                    >
+                      <BookmarkCheck size={14} />
+                      {saved ? "Saved" : "Save"}
+                    </button>
+
+                    <Link
+                      to={`/search?repo=${encodeURIComponent(item.name)}`}
+                      className="view-all-link"
+                      style={{ fontSize: "12px", marginLeft: "6px" }}
+                      title="View analysis"
+                    >
+                      <ArrowUpRight size={16} />
+                    </Link>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="history-empty-tip">
+            <div className="empty-icon">
+              <Search size={22} />
+            </div>
+            <h3>No search history found</h3>
+            <p>Repositories you analyze will automatically be cataloged here.</p>
+            <Link to="/search" className="primary-button" style={{ display: "inline-flex" }}>
+              <Search size={16} /> Search a Repository
+            </Link>
+          </div>
+        )}
       </section>
     </div>
   );

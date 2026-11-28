@@ -15,9 +15,19 @@ export default function Topbar() {
         setDropdownOpen(false);
       }
     }
+    function handleKeyDown(event) {
+      if ((event.metaKey || event.ctrlKey) && event.key === "k") {
+        event.preventDefault();
+        navigate("/search");
+      }
+    }
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [navigate]);
 
   const handleLogout = () => {
     logout();
@@ -29,7 +39,18 @@ export default function Topbar() {
 
   return (
     <header className="topbar">
-      <div className="topbar-search">
+      <div
+        className="topbar-search"
+        onClick={() => navigate("/search")}
+        style={{ cursor: "pointer" }}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            navigate("/search");
+          }
+        }}
+      >
         <Search size={18} />
         <span>Search repositories, projects...</span>
         <kbd>

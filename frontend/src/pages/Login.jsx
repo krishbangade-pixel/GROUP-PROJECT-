@@ -1,11 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { GitBranch, Eye, EyeOff, AlertCircle, Sparkles } from "lucide-react";
+import { GitBranch, Eye, EyeOff, AlertCircle, Database } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 export default function Login() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, user, loading: authLoading } = useAuth();
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [user, authLoading, navigate]);
 
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -13,7 +19,7 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
@@ -27,24 +33,19 @@ export default function Login() {
       return;
     }
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters long.");
-      return;
-    }
-
     setLoading(true);
 
-    setTimeout(() => {
-      login({ identifier, password });
+    try {
+      await login({ identifier, password });
+      navigate("/dashboard");
+    } catch (err) {
+      setError(
+        err?.message ||
+        "Invalid username or password. Please verify your credentials."
+      );
+    } finally {
       setLoading(false);
-      navigate("/");
-    }, 400);
-  };
-
-  const handleDemoFill = () => {
-    setIdentifier("krishbangade-pixel");
-    setPassword("password123");
-    setError("");
+    }
   };
 
   return (
@@ -57,7 +58,7 @@ export default function Login() {
             </div>
           </Link>
           <h1>Sign in to RepoRadar</h1>
-          <p>Enter your credentials to access your workspace</p>
+          <p>Connected to Supabase Authentication & Database</p>
         </div>
 
         {error && (
@@ -79,7 +80,7 @@ export default function Login() {
                 autoComplete="username"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
-                placeholder="name@example.com"
+                placeholder="name@example.com or username"
                 required
                 autoFocus
               />
@@ -93,7 +94,7 @@ export default function Login() {
                   className="auth-link-subtle"
                   onClick={(e) => {
                     e.preventDefault();
-                    alert("Demo mode: Any password with 6+ characters will sign you in.");
+                    alert("To reset password, enter your email and contact the Supabase administrator.");
                   }}
                 >
                   Forgot password?
@@ -125,22 +126,14 @@ export default function Login() {
               className="auth-submit-btn"
               disabled={loading}
             >
-              {loading ? "Signing in..." : "Sign in"}
+              {loading ? "Signing in with Supabase..." : "Sign in"}
             </button>
           </form>
 
-          <div className="auth-divider">
-            <span>or</span>
+          <div className="auth-supabase-badge">
+            <Database size={13} />
+            <span>Powered by Supabase Auth</span>
           </div>
-
-          <button
-            type="button"
-            className="auth-demo-btn"
-            onClick={handleDemoFill}
-          >
-            <Sparkles size={15} />
-            <span>Use Demo Account (krishbangade-pixel)</span>
-          </button>
         </div>
 
         <div className="auth-switch-card">

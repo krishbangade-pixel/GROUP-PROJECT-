@@ -82,7 +82,7 @@ export default function SettingsPage() {
 
         <div className="settings-info-row">
           <span>Analysis mode</span>
-          <strong>Demo Preview</strong>
+          <strong>Live Supabase & Gemini AI</strong>
         </div>
       </section>
 

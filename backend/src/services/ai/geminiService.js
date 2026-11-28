@@ -1,16 +1,13 @@
 
 const { GoogleGenAI } = require("@google/genai");
 
-const API_KEY = process.env.GEMINI_API_KEY;
-const MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
-
-if (!API_KEY) {
-    throw new Error("GEMINI_API_KEY is missing from the .env file.");
+function getAIClient() {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+        throw new Error("GEMINI_API_KEY is missing from the backend/.env file.");
+    }
+    return new GoogleGenAI({ apiKey });
 }
-
-const ai = new GoogleGenAI({
-    apiKey: API_KEY
-});
 
 // Wait before retrying a failed request.
 function delay(milliseconds) {
@@ -72,8 +69,10 @@ ${JSON.stringify(repositoryData, null, 2)}
                 `Gemini request attempt ${attempt}/${maxAttempts}`
             );
 
+            const ai = getAIClient();
+            const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
             const response = await ai.models.generateContent({
-                model: MODEL,
+                model: model,
                 contents: prompt,
                 config: {
                     responseMimeType: "application/json",
