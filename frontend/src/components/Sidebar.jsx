@@ -13,7 +13,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 
 const navigation = [
-  { name: "Dashboard", path: "/", icon: LayoutDashboard },
+  { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
   { name: "Repository Search", path: "/search", icon: Search },
   { name: "History", path: "/history", icon: History },
   { name: "Commit Analyzer", path: "/commit-analyzer", icon: GitCommit },
@@ -25,7 +25,7 @@ export default function Sidebar() {
 
   return (
     <aside className="sidebar">
-      <div className="sidebar-brand">
+      <Link to="/" className="sidebar-brand" style={{ textDecoration: "none", color: "inherit" }} title="Back to Landing Page">
         <div className="brand-icon">
           <GitBranch size={22} />
         </div>
@@ -34,7 +34,7 @@ export default function Sidebar() {
           <h2>RepoRadar</h2>
           <span>AI Repository Explorer</span>
         </div>
-      </div>
+      </Link>
 
       <div className="workspace-label">WORKSPACE</div>
 

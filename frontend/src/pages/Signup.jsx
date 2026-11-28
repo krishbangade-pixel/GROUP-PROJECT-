@@ -1,11 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { GitBranch, Eye, EyeOff, AlertCircle, Database } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 export default function Signup() {
   const navigate = useNavigate();
-  const { signup } = useAuth();
+  const { signup, user, loading: authLoading } = useAuth();
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [user, authLoading, navigate]);
 
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
@@ -44,7 +50,7 @@ export default function Signup() {
 
     try {
       await signup({ name, username, email, password });
-      navigate("/");
+      navigate("/dashboard");
     } catch (err) {
       setError(
         err?.message || "Failed to create Supabase account. Please try again."

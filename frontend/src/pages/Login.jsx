@@ -1,11 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { GitBranch, Eye, EyeOff, AlertCircle, Database } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 export default function Login() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, user, loading: authLoading } = useAuth();
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [user, authLoading, navigate]);
 
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -31,7 +37,7 @@ export default function Login() {
 
     try {
       await login({ identifier, password });
-      navigate("/");
+      navigate("/dashboard");
     } catch (err) {
       setError(
         err?.message ||
